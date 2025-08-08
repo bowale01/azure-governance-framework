@@ -83,7 +83,7 @@ Each folder contains practical scenarios you can discuss in interviews:
 - **Policy Enforcement Demo**: Automated compliance checking
 - **Monitoring Demo**: Security event detection and response
 
-## 🏆 Interview Tips
+## 🏆 Int Tips
 
 - Focus on **practical implementation** rather than theoretical knowledge
 - Demonstrate understanding of **business impact** of compliance
