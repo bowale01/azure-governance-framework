@@ -6,7 +6,7 @@
 
 A comprehensive framework for implementing Azure governance and compliance controls for **GDPR**, **SOC 2**, and **ISO 27001** requirements. This project provides practical, production-ready templates and automation scripts that demonstrate enterprise-level Azure governance expertise.
 
-## 🎯 **Perfect for Interview Preparation**
+
 
 This project showcases **practical implementation experience** rather than theoretical knowledge, giving you a competitive advantage in Azure governance interviews.
 
