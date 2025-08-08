@@ -1,0 +1,37 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Deploy GDPR Foundation Template",
+			"type": "shell",
+			"command": "az",
+			"args": [
+				"deployment",
+				"group",
+				"create",
+				"--resource-group",
+				"${input:resourceGroupName}",
+				"--template-file",
+				"templates/governance/gdpr-foundation.json",
+				"--parameters",
+				"environmentName=${input:environmentName}",
+				"dataResidencyRegion=${input:dataResidencyRegion}",
+				"enableCustomerManagedKeys=true"
+			],
+			"group": "build",
+			"isBackground": false,
+			"problemMatcher": [],
+			"presentation": {
+				"echo": true,
+				"reveal": "always",
+				"focus": false,
+				"panel": "shared",
+				"showReuseMessage": true,
+				"clear": false
+			},
+			"options": {
+				"cwd": "${workspaceFolder}"
+			}
+		}
+	]
+}

@@ -1,0 +1,170 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "description": "GDPR Compliance Foundation - Data Classification and Access Controls",
+    "author": "Azure Governance Framework",
+    "compliance": {
+      "gdpr": ["Article 32 - Security of processing", "Article 25 - Data protection by design"],
+      "iso27001": ["A.9.1.1 - Access control policy", "A.18.1.4 - Privacy and protection of PII"],
+      "soc2": ["CC6.1 - Logical and physical access controls"]
+    }
+  },
+  "parameters": {
+    "environmentName": {
+      "type": "string",
+      "defaultValue": "prod",
+      "allowedValues": ["dev", "test", "prod"],
+      "metadata": {
+        "description": "Environment designation for resource naming and policies"
+      }
+    },
+    "dataResidencyRegion": {
+      "type": "string",
+      "defaultValue": "West Europe",
+      "allowedValues": ["West Europe", "North Europe", "France Central", "Germany West Central"],
+      "metadata": {
+        "description": "EU region for GDPR data residency compliance"
+      }
+    },
+    "enableCustomerManagedKeys": {
+      "type": "bool",
+      "defaultValue": true,
+      "metadata": {
+        "description": "Enable Customer-Managed Keys for encryption at rest"
+      }
+    }
+  },
+  "variables": {
+    "resourcePrefix": "[concat('gdpr-', parameters('environmentName'))]",
+    "keyVaultName": "[concat(variables('resourcePrefix'), '-kv-', uniqueString(resourceGroup().id))]",
+    "storageAccountName": "[concat(replace(variables('resourcePrefix'), '-', ''), 'sa', uniqueString(resourceGroup().id))]",
+    "logAnalyticsName": "[concat(variables('resourcePrefix'), '-law-', uniqueString(resourceGroup().id))]"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.KeyVault/vaults",
+      "apiVersion": "2021-11-01-preview",
+      "name": "[variables('keyVaultName')]",
+      "location": "[parameters('dataResidencyRegion')]",
+      "properties": {
+        "sku": {
+          "family": "A",
+          "name": "premium"
+        },
+        "tenantId": "[subscription().tenantId]",
+        "enabledForDiskEncryption": true,
+        "enabledForTemplateDeployment": true,
+        "enabledForDeployment": true,
+        "enableSoftDelete": true,
+        "softDeleteRetentionInDays": 90,
+        "enablePurgeProtection": true,
+        "accessPolicies": [],
+        "networkAcls": {
+          "bypass": "AzureServices",
+          "defaultAction": "Deny"
+        }
+      },
+      "tags": {
+        "Environment": "[parameters('environmentName')]",
+        "DataClassification": "Confidential",
+        "GDPRScope": "PersonalData",
+        "RetentionPolicy": "7Years",
+        "Purpose": "GDPR-Encryption-Keys"
+      }
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts",
+      "apiVersion": "2022-09-01",
+      "name": "[variables('storageAccountName')]",
+      "location": "[parameters('dataResidencyRegion')]",
+      "kind": "StorageV2",
+      "sku": {
+        "name": "Standard_ZRS"
+      },
+      "properties": {
+        "supportsHttpsTrafficOnly": true,
+        "minimumTlsVersion": "TLS1_2",
+        "allowBlobPublicAccess": false,
+        "allowSharedKeyAccess": false,
+        "allowCrossTenantReplication": false,
+        "defaultToOAuthAuthentication": true,
+        "encryption": {
+          "services": {
+            "blob": {
+              "enabled": true,
+              "keyType": "[if(parameters('enableCustomerManagedKeys'), 'Customer', 'Service')]"
+            },
+            "file": {
+              "enabled": true,
+              "keyType": "[if(parameters('enableCustomerManagedKeys'), 'Customer', 'Service')]"
+            }
+          },
+          "keySource": "[if(parameters('enableCustomerManagedKeys'), 'Microsoft.Keyvault', 'Microsoft.Storage')]",
+          "keyvaultproperties": "[if(parameters('enableCustomerManagedKeys'), createObject('keyname', 'storage-encryption-key', 'keyvaulturi', reference(resourceId('Microsoft.KeyVault/vaults', variables('keyVaultName'))).vaultUri), json('null'))]"
+        },
+        "networkAcls": {
+          "bypass": "AzureServices",
+          "defaultAction": "Deny"
+        }
+      },
+      "tags": {
+        "Environment": "[parameters('environmentName')]",
+        "DataClassification": "Restricted",
+        "GDPRScope": "PersonalData",
+        "RetentionPolicy": "AsPerLegalRequirements",
+        "Purpose": "GDPR-Compliant-Storage"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.KeyVault/vaults', variables('keyVaultName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.OperationalInsights/workspaces",
+      "apiVersion": "2022-10-01",
+      "name": "[variables('logAnalyticsName')]",
+      "location": "[parameters('dataResidencyRegion')]",
+      "properties": {
+        "sku": {
+          "name": "PerGB2018"
+        },
+        "retentionInDays": 730,
+        "features": {
+          "searchVersion": 1,
+          "legacy": 0,
+          "enableLogAccessUsingOnlyResourcePermissions": true
+        }
+      },
+      "tags": {
+        "Environment": "[parameters('environmentName')]",
+        "DataClassification": "Internal",
+        "GDPRScope": "AuditLogs",
+        "RetentionPolicy": "2Years",
+        "Purpose": "GDPR-Audit-Logging"
+      }
+    }
+  ],
+  "outputs": {
+    "keyVaultName": {
+      "type": "string",
+      "value": "[variables('keyVaultName')]"
+    },
+    "storageAccountName": {
+      "type": "string",
+      "value": "[variables('storageAccountName')]"
+    },
+    "logAnalyticsWorkspaceId": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.OperationalInsights/workspaces', variables('logAnalyticsName'))).customerId]"
+    },
+    "complianceMetadata": {
+      "type": "object",
+      "value": {
+        "dataResidency": "[parameters('dataResidencyRegion')]",
+        "encryptionStandard": "[if(parameters('enableCustomerManagedKeys'), 'Customer-Managed-Keys', 'Service-Managed-Keys')]",
+        "auditRetention": "730 days",
+        "gdprCompliant": true
+      }
+    }
+  }
+}
